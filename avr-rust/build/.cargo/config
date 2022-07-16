@@ -1,0 +1,8 @@
+
+                [source.crates-io]
+                replace-with = 'vendored-sources'
+                registry = 'https://example.com'
+
+                [source.vendored-sources]
+                directory = '/Users/denham/Documents/selfmade-rtos/avr-rust/rust/vendor'
+            
