@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "minios.h"
+#include  "minios.h"
 #include "syscall.h"
 
 void wait_task(unsigned short interval)
@@ -20,18 +20,18 @@ void create_task(unsigned char task_id, void (*task)(void))
 
 void start_task(unsigned char task_id, unsigned short status)
 {
-  unsigned short tmp;
-  tmp = (1 << task_id);
+  unsigned short flags;
+  flags = (1 << task_id);
   if (status == READY)
   {
-    ready_que |= tmp;
+    ready_que |= flags;
   }
   if (status == SUSPEND)
   {
-    suspend_que |= tmp;
+    suspend_que |= flags;
   }
   if (status == WAIT)
   {
-    wait_que |= tmp;
+    wait_que |= flags;
   }
 }
