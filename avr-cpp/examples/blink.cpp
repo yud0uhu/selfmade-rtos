@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "blink.hpp"
 
 #define OFF 0
 #define ON OFF + 1
@@ -87,9 +88,13 @@ void start_task(unsigned char task_id, unsigned short status)
 /* task functions */
 void task_a(void)
 {
-  digitalWrite(LED_BUILTIN, HIGH);
-  wait_task(TASKA_INTERVAL);
-  Serial.print("taskA");
+  // digitalWrite(LED_BUILTIN, HIGH);
+  // wait_task(TASKA_INTERVAL);
+  // Serial.print("taskA");
+  digitalWrite(LED_BUILTIN, HIGH); // turn the LED on (HIGH is the voltage level)
+  delay(1000);                     // wait for a second
+  digitalWrite(LED_BUILTIN, LOW);  // turn the LED off by making the voltage LOW
+  delay(1000);
 }
 
 void task_b(void)
