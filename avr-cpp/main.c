@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "minios.h"
+#include  "minios.h"
 #include "syscall.h"
 
 void task_a(void)
 {
     // digitalWrite(LED_BUILTIN, HIGH);
     wait_task(TASKA_INTERVAL);
-    printf("taskA");
+    printf("%d¥n",TASKA_INTERVAL);
     // Serial.print("taskA");
 }
 
@@ -16,7 +16,7 @@ void task_b(void)
 {
     // digitalWrite(LED_BUILTIN, HIGH);
     wait_task(TASKB_INTERVAL);
-    printf("taskB");
+    printf("%d¥n",TASKB_INTERVAL);
     // Serial.print("taskB");
 }
 
@@ -24,7 +24,7 @@ void task_c(void)
 {
     // digitalWrite(LED_BUILTIN, HIGH);
     wait_task(TASKB_INTERVAL);
-    printf("taskC");
+    printf("%d¥n",TASKC_INTERVAL);
     // Serial.print("taskC");
 }
 
