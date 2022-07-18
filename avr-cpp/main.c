@@ -23,7 +23,7 @@ void task_b(void)
 void task_c(void)
 {
     // digitalWrite(LED_BUILTIN, HIGH);
-    wait_task(TASKB_INTERVAL);
+    wait_task(TASKC_INTERVAL);
     printf("%d¥n",TASKC_INTERVAL);
     // Serial.print("taskC");
 }
