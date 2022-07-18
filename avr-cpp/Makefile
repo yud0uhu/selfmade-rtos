@@ -1,11 +1,9 @@
 OBJS += syscall.o main.o
-TARGET ?= minios
-CC ?= gcc
+TARGET ?= mini
+CC := gcc
 CFLAGS =
-#CFLAGS += -O
 CFLAGS += -g
 CFLAGS += -Wall
-CFLAGS += -static
 
 .SUFFIXES: .c .o
 
