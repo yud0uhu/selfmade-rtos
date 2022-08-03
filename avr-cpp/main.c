@@ -6,59 +6,75 @@
 
 void task_a(void)
 {
-    // digitalWrite(LED_BUILTIN, HIGH);
+    digitalWrite(LED_BUILTIN, HIGH);
     wait_task(TASKA_INTERVAL);
-    printf("%d¥n",TASKA_INTERVAL);
+    // printf("タスク%d",tcb[TASK_ID0].TASK_ID);
+    // printf("優先度%d\n",tcb[TASK_ID0].PRIORITY);
     // Serial.print("taskA");
 }
 
 void task_b(void)
 {
-    // digitalWrite(LED_BUILTIN, HIGH);
+    digitalWrite(LED_BUILTIN, HIGH);
     wait_task(TASKB_INTERVAL);
-    printf("%d¥n",TASKB_INTERVAL);
+    // printf("タスク%d",tcb[TASK_ID1].TASK_ID);
+    // printf("優先度%d\n",tcb[TASK_ID1].PRIORITY);
     // Serial.print("taskB");
 }
 
 void task_c(void)
 {
-    // digitalWrite(LED_BUILTIN, HIGH);
+    digitalWrite(LED_BUILTIN, HIGH);
     wait_task(TASKC_INTERVAL);
-    printf("%d¥n",TASKC_INTERVAL);
+    // printf("タスク%d",tcb[TASK_ID2].TASK_ID);
+    // printf("優先度%d\n",tcb[TASK_ID2].PRIORITY);
     // Serial.print("taskC");
 }
 
 /* initialize */
 void init_os(void)
 {
-  ready_que = 0;
-  suspend_que = 0;
-  wait_que = 0;
-  run_que = 0;
+    ready_que = 0;
+    suspend_que = 0;
+    wait_que = 0;
+    run_que = 0;
 }
 
-int main (void)
+void swap_task(TCB* a, TCB* b) {
+	TCB temp;
+	temp = *a;
+	*a = *b;
+	*b = temp;
+	return;
+}
+
+void scheduling(void)
 {
-    TCB tcb_task;
+    run_que = TASK_ID0;
+
+    while (ON)
+    {
+        if (tcb[run_que].PRIORITY < tcb[run_que+1].PRIORITY)
+        {
+            swap_task(&tcb[run_que],&tcb[run_que+1]);
+        }
+        (*tcb[run_que].task)();
+        run_que++;
+        if(run_que == TASK_ID_MAX) {
+            run_que = TASK_ID0;
+        }
+    }
+}
+
+int main(void){
     init_os();
-    create_task(TASK_ID0, task_a);
-    create_task(TASK_ID1, task_b);
-    create_task(TASK_ID2, task_c);
+    create_task(TASK_ID0, task_a, 20);
+    create_task(TASK_ID1, task_b, 50);
+    create_task(TASK_ID2, task_c, 40);
 
     start_task(TASK_ID0, READY);
     start_task(TASK_ID1, SUSPEND);
     start_task(TASK_ID2, SUSPEND);
 
-    run_que = TASK_ID0;
-
-    while (ON)
-    {
-        tcb_task = tcb[run_que];
-        (*(tcb_task.task))();
-        run_que++;
-        if (run_que == TASK_ID_MAX)
-        {
-            run_que = TASK_ID0;
-        }
-    }
+    scheduling();
 }

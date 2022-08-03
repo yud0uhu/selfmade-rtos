@@ -13,9 +13,11 @@ void wait_task(unsigned short interval)
   wait_que |= flags;      /* ウェイト・フラグを立てる */
 }
 
-void create_task(unsigned char task_id, void (*task)(void))
+void create_task(unsigned char task_id, void (*task)(void),int priority)
 {
   tcb[task_id].task = task;
+  tcb[task_id].TASK_ID = task_id;
+  tcb[task_id].PRIORITY = priority;
 }
 
 void start_task(unsigned char task_id, unsigned short status)
