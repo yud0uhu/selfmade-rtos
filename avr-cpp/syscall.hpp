@@ -21,5 +21,3 @@ inline volatile unsigned short wait_que;
 #define TASK_ID0 0
 #define TASK_ID1 1
 #define TASK_ID2 2
-
-// TCB tcb[TASK_ID_MAX];

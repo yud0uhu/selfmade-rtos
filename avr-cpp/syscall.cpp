@@ -5,34 +5,40 @@
 #include "syscall.hpp"
 #include <queue>
 #include <iostream>
-
+#include <functional>
+#include <memory>
 /* task control block */
 
-class tcb
+class TCB
 {
-  void (*task)(void);             /* タスク関数の実行開始アドレス */
+public:
+  void (*task_)(void);            /* 関数ポインタの実行開始アドレス */
   unsigned char task_id;          /* タスクの識別子 */
   volatile unsigned short status; /* ready, suspend runの3つの状態を持つ */
   volatile int priority;          /* タスクの優先度(0~9) */
-public:
-  tcb()
+  void setTask(void (*task)(void))
   {
-    task_id = 0;
-    priority = 0;
+    task_ = task;
   }
-  tcb(unsigned char t, volatile int p)
-  {
-    task_id = t;
-    priority = p;
-  }
-
-  unsigned char getTaskId() const { return task_id; }
-  volatile int getPriority() const { return priority; }
 };
 
-bool operator<(const tcb &a, const tcb &b)
+class PriorityQue : public TCB
 {
-  return a.getPriority() < b.getPriority();
+public:
+  PriorityQue(unsigned char _task_id, volatile unsigned short _status, void (*task)(void), volatile int _priority)
+  {
+    this->task_id = _task_id;
+    this->status = _status;
+    this->setTask(task);
+    this->priority = _priority;
+  }
+};
+
+std::priority_queue<PriorityQue> tcb_que;
+
+bool operator<(const PriorityQue &a, const PriorityQue &b)
+{
+  return a.priority < b.priority;
 }
 
 void wait_task(unsigned short interval)
@@ -44,17 +50,9 @@ void wait_task(unsigned short interval)
   wait_que |= flags;      /* ウェイト・フラグを立てる */
 }
 
-void create_task(unsigned char task_id, void (*task)(void), volatile int priority)
+void create_task(unsigned char task_id, volatile unsigned short status, void (*task)(void), volatile int priority)
 {
-  std::priority_queue<tcb> tcb_que;
-  tcb_que.push(tcb(task_id, priority));
-
-  std::cout << "Priorities: ";
-  while (!tcb_que.empty())
-  {
-    std::cout << tcb_que.top().getPriority() << "\n";
-    tcb_que.pop();
-  }
+  tcb_que.push(PriorityQue(task_id, status, task, priority));
 }
 
 void start_task(unsigned char task_id, unsigned short status)
@@ -72,5 +70,18 @@ void start_task(unsigned char task_id, unsigned short status)
   if (status == WAIT)
   {
     wait_que |= flags;
+  }
+}
+
+void scheduling(void)
+{
+  while (!tcb_que.empty())
+  {
+    /* Debug
+     * std::cout << (int)tcb_que.top().task_id << ": " << tcb_que.top().priority << "\n";
+     */
+    void (*run)() = tcb_que.top().task_;
+    run();
+    tcb_que.pop();
   }
 }
