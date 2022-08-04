@@ -4,7 +4,7 @@
 
 /* systemcall */
 void create_task(unsigned char task_id, volatile unsigned short status, void (*task)(void), volatile int priority);
-void start_task(unsigned char task_id, unsigned short status);
+void delete_task(unsigned char task_id);
 void suspend_task(unsigned char task_id);
 void ready_task(unsigned char task_id);
 void sleep_task(void);

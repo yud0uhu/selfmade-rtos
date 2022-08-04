@@ -7,6 +7,7 @@
 #include <iostream>
 #include <functional>
 #include <memory>
+#include <set>
 /* task control block */
 
 class TCB
@@ -34,7 +35,7 @@ public:
   }
 };
 
-std::priority_queue<PriorityQue> tcb_que;
+std::multiset<PriorityQue> tcb_que;
 
 bool operator<(const PriorityQue &a, const PriorityQue &b)
 {
@@ -52,36 +53,31 @@ void wait_task(unsigned short interval)
 
 void create_task(unsigned char task_id, volatile unsigned short status, void (*task)(void), volatile int priority)
 {
-  tcb_que.push(PriorityQue(task_id, status, task, priority));
+  tcb_que.insert(PriorityQue(task_id, status, task, priority));
 }
 
-void start_task(unsigned char task_id, unsigned short status)
+void delete_task(unsigned char task_id)
 {
-  unsigned short flags;
-  flags = (1 << task_id);
-  if (status == READY)
+  for (auto it = tcb_que.begin(); it != tcb_que.end();)
   {
-    ready_que |= flags;
-  }
-  if (status == SUSPEND)
-  {
-    suspend_que |= flags;
-  }
-  if (status == WAIT)
-  {
-    wait_que |= flags;
+    if ((*it).task_id == task_id)
+    {
+      it = tcb_que.erase(it);
+    }
+    else
+    {
+      ++it;
+      std::cout << (*it).task_id << std::endl;
+    }
   }
 }
 
 void scheduling(void)
 {
-  while (!tcb_que.empty())
+  for (auto it = tcb_que.rbegin(); it != tcb_que.rend();)
   {
-    /* Debug
-     * std::cout << (int)tcb_que.top().task_id << ": " << tcb_que.top().priority << "\n";
-     */
-    void (*run)() = tcb_que.top().task_;
+    void (*run)() = it->task_;
     run();
-    tcb_que.pop();
+    ++it;
   }
 }
