@@ -68,7 +68,7 @@ void Task::create_task(TaskId task_id, TaskState state, Priority priority, void 
     pnew->state_ = state;
     pnew->priority_ = priority;
     pnew->task_handler_ = task_handler;
-    // redey_que.ptail_->pnext_ = pnew;
+    // redey_que.ptail_->pnext_ = pnew; // セグフォ
     ready_que.ptail_ = pnew;
     return;
 }
@@ -85,7 +85,7 @@ int Task::pop_task(Task *phead_, Task *ptail_)
     if (phead_ == NULL)
         return -1; /*アンダーフロー*/
 
-    // phead_ = phead_->pnext_;
+    // phead_ = phead_->pnext_; // セグフォ
     int priority = pold_->priority_;
     free(pold_);
 
