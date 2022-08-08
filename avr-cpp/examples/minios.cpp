@@ -155,8 +155,9 @@ int main(int argc, char *argv[])
     {
         if (task_is_empty)
         {
-            printf("priority:%d", task.pop_task(phead_, ptail_));
+            // printf("priority:%d", task.pop_task(phead_, ptail_));
             // (*(pcurrent->task_handler_))();
+            task.task_handler_;
             // 優先度に応じてスケジューリング処理
         }
         else
