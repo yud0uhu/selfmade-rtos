@@ -16,155 +16,153 @@ typedef unsigned char Priority;
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <cassert>
+
 enum TaskState
 {
     RUNNING,
-    WAITING,
-    READY
+    READY,
+    SUSPEND
 };
 
 /* task control block */
 class Task
 {
 public:
-    TaskId task_id_;    /* タスクの識別子 0~255の整数値*/
-    TaskState state_;   /* running, waiting, readyの3つの状態を持つ */
-    Priority priority_; /* タスクの優先度(0~9) */
-    // int *pstack_;               /* タスクのスタック領域の先頭アドレスを保持 */
-    Task *pnext_;                /* レディー・キューへの接続用ポインタ */
-    void (*task_handler_)(void); /* 関数ポインタの実行開始アドレス */
-    static void create_task(TaskId task_id, TaskState state, Priority priority, void (*task_handler)());
-    static int pop_task(Task *phead_, Task *ptail_);
-    static void delete_task(void);
-    Task *init_task(void);
+    TaskId task_id_;                                                            /* タスクの識別子 0~255の整数値*/
+    Task(TaskId task_id, void (*function)(), Priority priority, int stacksize); /* This (usually) specifies the amount of stack space that is to be allocated to the task. */
+    TaskState state_;                                                           /* running, ready, suspendの3つの状態を持つ */
+    Priority priority_;                                                         /* タスクの優先度(0~9) */
+    int *pstack_;                                                               /* タスクのスタック領域の先頭アドレスを保持 */
+    Task *pnext_;                                                               /* Pointer to next task */
+    void (*task_handler_)(void);                                                /* 関数ポインタの実行開始アドレス */
 };
-static Task *pcurrent; /* カレント・タスク */
-static unsigned int readyque_bitmap;
 
-typedef struct
+class TaskList
 {
+public:
+    TaskList();
+    Task *delete_task(Task *pTask_);
+    void create_task(Task *pTask_);
+
     Task *phead_;
-    Task *ptail_;
-} ReadyQue;
-static ReadyQue ready_que;
-static void scheduler(void);
+};
 
-Task *Task::init_task(void)
+TaskList::TaskList()
 {
-    struct Task *ptask_ = (Task *)malloc(sizeof(Task));
-    ready_que.phead_ = NULL;
-    ready_que.ptail_ = NULL;
-
-    return ptask_;
+    phead_ = NULL;
 }
 
-void Task::create_task(TaskId task_id, TaskState state, Priority priority, void (*task_handler)())
+class Scheduler
 {
+public:
+    Scheduler();
+    void start();
+    void scheduler();
+    static Task *pRunningTask;
+    static TaskList readyList;
+};
 
-    struct Task *pnew = (Task *)malloc(sizeof(Task));
-    pnew->pnext_ = NULL;
-    pnew->task_id_ = task_id;
-    pnew->state_ = state;
-    pnew->priority_ = priority;
-    pnew->task_handler_ = task_handler;
-    // redey_que.ptail_->pnext_ = pnew; // セグフォ
-    ready_que.ptail_ = pnew;
+Scheduler os;
+Task *Scheduler::pRunningTask = NULL;
+TaskList Scheduler::readyList;
+
+void run(Task *pTask)
+{
+    pTask->task_handler_();
+    os.pRunningTask = NULL;
+    os.scheduler();
+};
+
+Scheduler::Scheduler(void)
+{
     return;
 }
 
-bool task_is_empty(void)
+void Scheduler::start(void)
 {
-    return ready_que.phead_ == NULL;
+    scheduler();
 }
 
-int Task::pop_task(Task *phead_, Task *ptail_)
+void Scheduler::scheduler(void)
 {
-    struct Task *pold_;
+    Task *pOldTask;
+    Task *pNewTask;
 
-    if (phead_ == NULL)
-        return -1; /*アンダーフロー*/
+    if (pRunningTask != readyList.phead_)
+    {
+        pOldTask = pRunningTask;
+        pNewTask = readyList.phead_;
 
-    // phead_ = phead_->pnext_; // セグフォ
-    int priority = pold_->priority_;
-    free(pold_);
+        pNewTask->state_ = RUNNING;
+        pRunningTask = pNewTask;
+    }
 
-    return priority;
+    pRunningTask->task_handler_;
 }
 
-static void scheduler(void)
+void TaskList::create_task(Task *pTask)
 {
-#if TASK_ID_MAX > 32
-#error ビットマップを配列化する必要あり
-#endif
-    unsigned int bitmap = readyque_bitmap;
-    int n = 0;
-    static const int bitmap2num[16] =
-        {
-            -32, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0};
-    if (!(bitmap & 0xffff))
+    Task **ppPrev_ = &this->phead_;
+    if (*ppPrev_ == NULL)
     {
-        bitmap >>= 16;
-        n += 16;
+        *ppPrev_ == pTask;
+        return;
     }
-    if (!(bitmap & 0xff))
+    while (*ppPrev_ != NULL && pTask->priority_ <= (*ppPrev_)->priority_)
     {
-        bitmap >>= 8;
-        n += 8;
+        ppPrev_ = &(*ppPrev_)->pnext_;
     }
-    if (!(bitmap & 0xf))
+
+    if (ppPrev_ == &(this->phead_) &&
+        pTask->priority_ > (*ppPrev_)->priority_)
     {
-        bitmap >>= 4;
-        n += 4;
+        pTask->pnext_ = (*ppPrev_);
+        this->phead_ = pTask;
     }
-    n += bitmap2num[bitmap & 0xf];
-    if (n < 0)
+    else
     {
-        // exit(0);
+        pTask->pnext_ = (*ppPrev_)->pnext_;
+        *ppPrev_ = pTask;
     }
-    // TODO:タスク操作と紐付け
+}
+
+// void contextInit(void (*run)(Task *), Task *, int *pStackTop);
+Task::Task(TaskId task_id, void (*function)(), Priority priority, int stack_size)
+{
+    stack_size /= sizeof(int);
+    task_id_ = task_id;
+    state_ = READY;
+    priority_ = priority;
+    task_handler_ = function;
+    pstack_ = new int[stack_size];
+    pnext_ = NULL;
+    os.readyList.create_task(this);
+
+    // contextInit(run, this, pstack_ + stack_size);
+    os.scheduler();
 }
 
 void task_a(void)
 {
-    printf("taskId:%d", pcurrent->task_id_);
-    printf("priority:%d", pcurrent->priority_);
+    while (1)
+    {
+        printf("taskA");
+    }
     return;
 }
 void task_b(void)
 {
-    printf("%d", pcurrent->task_id_);
-    printf("priority:%d", pcurrent->priority_);
+    while (1)
+    {
+        printf("taskB");
+    }
     return;
 }
-static Task task;
+
+Task taskA(TASK_ID0, task_a, 150, 512);
+Task taskB(TASK_ID1, task_b, 120, 512);
+
 int main(int argc, char *argv[])
 {
-    Task task;
-    Task *phead_;
-    Task *ptail_;
-
-    // タスクを初期化
-    task.init_task();
-
-    // タスクを作成
-    task.create_task(1, READY, 0, task_a);
-    task.create_task(2, READY, 2, task_b);
-
-    while (ON)
-    {
-        if (task_is_empty)
-        {
-            // printf("priority:%d", task.pop_task(phead_, ptail_));
-            // (*(pcurrent->task_handler_))();
-            task.task_handler_;
-            // 優先度に応じてスケジューリング処理
-        }
-        else
-        {
-            exit(0);
-            printf("threads is NULL");
-        }
-        return 0;
-    }
+    os.start();
 }
