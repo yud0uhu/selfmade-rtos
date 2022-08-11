@@ -12,7 +12,7 @@
 #define TASK_ID2 2
 
 typedef unsigned char TaskId;
-typedef unsigned char Priority;
+typedef unsigned int Priority;
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,30 +24,51 @@ enum TaskState
     SUSPEND
 };
 
+struct Context
+{
+    int restTime;
+    TaskState state_;
+};
+
 /* task control block */
-class Task
+class TCB
 {
 public:
-    TaskId task_id_;                                                            /* タスクの識別子 0~255の整数値*/
-    Task(TaskId task_id, void (*function)(), Priority priority, int stacksize); /* This (usually) specifies the amount of stack space that is to be allocated to the task. */
-    TaskState state_;                                                           /* running, ready, suspendの3つの状態を持つ */
-    Priority priority_;                                                         /* タスクの優先度(0~9) */
-    int *pstack_;                                                               /* タスクのスタック領域の先頭アドレスを保持 */
-    Task *pnext_;                                                               /* Pointer to next task */
-    void (*task_handler_)(void);                                                /* 関数ポインタの実行開始アドレス */
+    TaskId task_id_;                                                           /* タスクの識別子 0~255の整数値*/
+    TCB(TaskId task_id, void (*function)(), Priority priority, int stacksize); /* This (usually) specifies the amount of stack space that is to be allocated to the task. */
+    TaskState state_;                                                          /* running, ready, suspendの3つの状態を持つ */
+    Priority priority_;                                                        /* タスクの優先度(0~9) */
+    int *pstack_;                                                              /* タスクのスタック領域の先頭アドレスを保持 */
+    TCB *pnext_;                                                               /* Pointer to next task */
+    void (*task_handler_)(void);                                               /* 関数ポインタの実行開始アドレス */
+    Context context;
 };
+void contextInit(Context *, void (*run)(TCB *), TCB *, int *pStackTop);
+void ContextSwitch(Context *pOldContext, Context *pNewContext);
 
-class TaskList
+void ContextSwitch(Context *pOldContext, Context *pNewContext)
+{
+    Context *pStackContext;
+    pStackContext = pOldContext;
+    // コンテキストスタックの存在判定
+    if (pStackContext != NULL)
+    {
+        pNewContext = pStackContext;
+        printf("%d", pNewContext->state_);
+        printf("%d", pOldContext->state_);
+    }
+}
+class TCBList
 {
 public:
-    TaskList();
-    Task *delete_task(Task *pTask_);
-    void create_task(Task *pTask_);
+    TCBList();
+    TCB *delete_task(TCB *pTCB);
+    void create_task(TCB *pTCB);
 
-    Task *phead_;
+    TCB *phead_;
 };
 
-TaskList::TaskList()
+TCBList::TCBList()
 {
     phead_ = NULL;
 }
@@ -58,18 +79,21 @@ public:
     Scheduler();
     void start();
     void scheduler();
-    static Task *pRunningTask;
-    static TaskList readyList;
+    static TCB *pRunningTask;
+    static TCBList readyList;
 };
 
+TCB *Scheduler::pRunningTask = NULL;
+TCBList Scheduler::readyList;
 Scheduler os;
-Task *Scheduler::pRunningTask = NULL;
-TaskList Scheduler::readyList;
+void run(TCB *pTCB);
 
-void run(Task *pTask)
+void run(TCB *pTCB)
 {
-    pTask->task_handler_();
+    pTCB->task_handler_();
+    os.readyList.delete_task(pTCB);
     os.pRunningTask = NULL;
+    delete pTCB->pstack_;
     os.scheduler();
 };
 
@@ -85,11 +109,17 @@ void Scheduler::start(void)
 
 void Scheduler::scheduler(void)
 {
-    Task *pOldTask;
-    Task *pNewTask;
+    TCB *pOldTask;
+    TCB *pNewTask;
 
+    printf("readyList.phead_ = %d ", readyList.phead_);
+
+    //
+    // If there is a higher-priority ready task, switch to it.
+    //
     if (pRunningTask != readyList.phead_)
     {
+        printf("pRunningTask != readyList.phead_");
         pOldTask = pRunningTask;
         pNewTask = readyList.phead_;
 
@@ -97,37 +127,64 @@ void Scheduler::scheduler(void)
         pRunningTask = pNewTask;
     }
 
-    pRunningTask->task_handler_;
+    if (pOldTask == NULL)
+    {
+        printf("pOldTask == NULL");
+        // ContextSwitch(NULL, &pNewTask->context);
+    }
+    else
+    {
+        // pOldTask->state_ = READY; // セグフォ
+        // ContextSwitch(&pOldTask->context, &pNewTask->context);
+    }
 }
 
-void TaskList::create_task(Task *pTask)
+void TCBList::create_task(TCB *pTCB)
 {
-    Task **ppPrev_ = &this->phead_;
-    if (*ppPrev_ == NULL)
+    TCB **ppPrev_ = &this->phead_;
+    if ((*ppPrev_) == NULL)
     {
-        *ppPrev_ == pTask;
+        (*ppPrev_) == pTCB;
         return;
     }
-    while (*ppPrev_ != NULL && pTask->priority_ <= (*ppPrev_)->priority_)
+    while ((*ppPrev_) != NULL && pTCB->priority_ <= (*ppPrev_)->priority_)
     {
         ppPrev_ = &(*ppPrev_)->pnext_;
     }
 
     if (ppPrev_ == &(this->phead_) &&
-        pTask->priority_ > (*ppPrev_)->priority_)
+        pTCB->priority_ > (*ppPrev_)->priority_)
     {
-        pTask->pnext_ = (*ppPrev_);
-        this->phead_ = pTask;
+        pTCB->pnext_ = (*ppPrev_);
+        this->phead_ = pTCB;
     }
     else
     {
-        pTask->pnext_ = (*ppPrev_)->pnext_;
-        *ppPrev_ = pTask;
+        pTCB->pnext_ = (*ppPrev_)->pnext_;
+        (*ppPrev_) = pTCB;
     }
 }
 
-// void contextInit(void (*run)(Task *), Task *, int *pStackTop);
-Task::Task(TaskId task_id, void (*function)(), Priority priority, int stack_size)
+TCB *TCBList::delete_task(TCB *pTCB)
+{
+    TCB **ppPrev = &this->phead_;
+
+    while (*ppPrev != NULL && *ppPrev != pTCB)
+    {
+        ppPrev = &(*ppPrev)->pnext_;
+    }
+
+    if (*ppPrev == NULL)
+    {
+        return (NULL);
+    }
+
+    *ppPrev = pTCB->pnext_;
+
+    return (pTCB);
+}
+
+TCB::TCB(TaskId task_id, void (*function)(), Priority priority, int stack_size)
 {
     stack_size /= sizeof(int);
     task_id_ = task_id;
@@ -136,33 +193,40 @@ Task::Task(TaskId task_id, void (*function)(), Priority priority, int stack_size
     task_handler_ = function;
     pstack_ = new int[stack_size];
     pnext_ = NULL;
-    os.readyList.create_task(this);
 
-    // contextInit(run, this, pstack_ + stack_size);
+    // contextInit(&context, run, this, pstack_ + stack_size);
+
+    os.readyList.create_task(this);
+    // run(this);
+
     os.scheduler();
 }
 
 void task_a(void)
 {
-    while (1)
-    {
-        printf("taskA");
-    }
+    printf("taskA");
+
+    // digitalWrite(13, HIGH);
+    // delay(100);
+    // digitalWrite(13, LOW);
+    // delay(300);
+
     return;
 }
 void task_b(void)
 {
-    while (1)
-    {
-        printf("taskB");
-    }
-    return;
+    printf("taskB");
 }
-
-Task taskA(TASK_ID0, task_a, 150, 512);
-Task taskB(TASK_ID1, task_b, 120, 512);
+void task_c(void)
+{
+    printf("taskC");
+}
 
 int main(int argc, char *argv[])
 {
+
+    TCB taskA(TASK_ID0, task_a, 150, 512);
+    TCB taskB(TASK_ID1, task_b, 120, 512);
+    TCB taskC(TASK_ID1, task_c, 90, 512);
     os.start();
 }
