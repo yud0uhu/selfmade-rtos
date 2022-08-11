@@ -214,5 +214,6 @@ int main(void)
     create_task(0, 3, task_a);
     create_task(1, 5, task_b);
     create_task(2, 2, task_c);
+    // クロック周波数ベースのタイマ割り込み処理を初期化
     os_start();
 }
