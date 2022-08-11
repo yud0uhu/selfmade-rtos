@@ -24,7 +24,12 @@ typedef unsigned int Priority;
 void task_init(unsigned char id);
 void os_start(void);
 int timer_handler();
+void timer_create(unsigned int tick);
+
 unsigned char i = 0;
+#define R 47.0
+int iPWM = 128;
+int iTarget = 98;
 
 enum TaskState
 {
@@ -145,20 +150,24 @@ int timer_handler()
 
     return 0;
 }
-void init_timer(void)
+void timer_create(unsigned int tick)
 {
-    // TCCR1A・TCCR1B・TCCR1CはPWMの動作を制御するレジスタ
+    // https://www.nongnu.org/avr-libc/user-manual/group__avr__interrupts.html
     // https://garretlab.web.fc2.com/arduino/inside/hardware/arduino/avr/cores/arduino/wiring_analog.c/analogWrite.html
     TCCR1A = 0x00;
-    TCCR1B = _BV(WGM12) | _BV(CS11) | _BV(CS10);
-    TCCR1C = 0x00;
-    // OCR1AH・OCR1AL・OCR1BH・OCR1BLは16ビットの比較レジスタ
-    OCR1AH = 0x98;
-    OCR1AL = 0x97; // OCR1A=39,063=0x9897
-    OCR1BH = 0x0F; // OCR1B=3,906=-0x0F42
-    OCR1BL = 0x42;
+    TCCR1B = 0x00;
+    // OCR1A・OCR1Bは16ビットの比較レジスタ
+    OCR1A = tick;  // 9pin
+    OCR1B = 31250; // 10pin
     /*
+      Arduino Uno ではinit()でCS11とCS10を1に設定している → 1<<CS12で外部クロックを立ち上がりでONにする
+      Arduino Uno ではinit()でCWM10を1に設定している → 1<<WGM12で波形をCTCモードをonにする
+    */
+    TCCR1B |= (1 << CS12) | (1 << WGM12); // CS12 -> 1(prescaler -> 256)
+    /*
+      TIMSK1 はタイマー1(16ビット)のレジスタ
       TIMSK1のOCE1AとOCIE1Bを1にすることで割り込みの許可を与える
+      OCE1AかOCIE1Bにどちらかに達したときに割り込みがかかる
       _BV()は中身を1に、~_BV()は0にする
     */
     TIMSK1 = (_BV(OCIE1B) | _BV(OCIE1A));
@@ -170,10 +179,6 @@ ISR(TIMER1_COMPA_vect)
     timer_handler();
 }
 
-ISR(TIMER1_COMPB_vect)
-{
-    // 何かの割り込みタスク
-}
 void task_a(void)
 {
     Serial.print("taskA");
@@ -186,14 +191,22 @@ void task_c(void)
 {
     Serial.print("taskC");
 }
-void setup()
-{
-    pinMode(10, OUTPUT); // 出力に設定
-}
+
+// 定電流源測定タスク
+// void loop()
+// {
+//     int iM1 = analogRead(A1);
+//     iPWM = iPWM - (int)((float)(iM1 - iTarget) / 5.0);
+//     analogWrite(3, iPWM);
+//     float fCurrent = (float)iM1 / 1.023 * 5.0 / R;
+//     Serial.print(fCurrent);
+//     Serial.println(" mA");
+//     delay(50);
+// }
+
 int main(void)
 {
     Serial.begin(9600);
-    DDRB = _BV(DDB5); // PORTB bit5を出力に設定
 
     create_task(0, 3, task_a);
     create_task(1, 5, task_b);
@@ -201,7 +214,9 @@ int main(void)
     os_start();
 
     // クロック周波数ベースのタイマ割り込み処理を初期化
-    init_timer();
+    // timer_createの引数にカウンターの周期を指定
+    // 62500*256(prescaler)/16MHz = 1秒
+    timer_create(62500);
     while (1)
         ; // 無限ループ（割込み待ち）
 }
