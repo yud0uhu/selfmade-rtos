@@ -13,7 +13,7 @@
 
 - 新規タスクの作成
 
-引数:unsigned char, unsigned int, void (\*task)(void)  
+引数:unsigned char, unsigned int / Priority, void (\*task)(void)  
 戻り値:void
 
 ### delete_task()
@@ -33,6 +33,8 @@ void task_function(void)
 // do somethin
 }
 
+- プライオリティは 0~10 の範囲で指定
+
 ```
 
 ## main 関数
@@ -43,6 +45,8 @@ void task_function(void)
 while (1)
         ;
 ```
+
+例
 
 ```c++
 int main(void)
@@ -57,3 +61,14 @@ int main(void)
 }
 
 ```
+
+### 備考
+
+#### タスク数
+
+`#define TASK_ID_MAX 3` で上限タスクを 3 としている.
+`TODO: 追加したタスクの数に応じてこの値は可変とする`
+
+#### シミュレーション環境
+
+[Tinkercad](https://www.tinkercad.com/things/2uc1RZ1pehi?sharecode=di9PmKFFPG8xi3DcQ0-Dp2gLGF1XviOcff3-7CuWrFw)
