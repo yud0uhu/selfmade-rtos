@@ -118,16 +118,18 @@ void os_start(void)
     _sysinfo.running = get_top_ready_id();
     _sysinfo.prev = _sysinfo.running;
     TCB[_sysinfo.running].state_ = RUNNING;
+    sei();
+    // timer_handler();
 }
 unsigned char run_que;
 int timer_handler()
 {
     while (1)
     {
-        // 優先順位順にタスクを実行
         run_que = _sysinfo.running;
-        while (run_que <= 2)
+        while (run_que <= TASK_ID_MAX - 1)
         {
+            // 優先順位順にタスクを実行
             tcb_t temp;
             if (TCB[run_que + 1].priority_ > TCB[run_que].priority_)
             {
@@ -137,17 +139,15 @@ int timer_handler()
                 TCB[run_que].state_ = RUNNING;
             }
 
-            if (run_que > 2)
+            if (run_que > TASK_ID_MAX - 1)
             {
-                run_que = 0;
+                run_que = TASK_ID0;
             }
-            printf("taskId = %d : ", run_que);
             (*TCB[run_que].task_handler_)();
             TCB[run_que].state_ = READY;
             run_que = run_que + 1;
         }
     }
-
     return 0;
 }
 void timer_create(unsigned int tick)
@@ -157,8 +157,8 @@ void timer_create(unsigned int tick)
     TCCR1A = 0x00;
     TCCR1B = 0x00;
     // OCR1A・OCR1Bは16ビットの比較レジスタ
-    OCR1A = tick;  // 9pin
-    OCR1B = 31250; // 10pin
+    OCR1A = tick; // 9pin
+    // OCR1B = 31250; // 10pin
     /*
       Arduino Uno ではinit()でCS11とCS10を1に設定している → 1<<CS12で外部クロックを立ち上がりでONにする
       Arduino Uno ではinit()でCWM10を1に設定している → 1<<WGM12で波形をCTCモードをonにする
@@ -171,7 +171,7 @@ void timer_create(unsigned int tick)
       _BV()は中身を1に、~_BV()は0にする
     */
     TIMSK1 = (_BV(OCIE1B) | _BV(OCIE1A));
-    sei();
+    // sei();
 }
 
 ISR(TIMER1_COMPA_vect)
@@ -179,17 +179,22 @@ ISR(TIMER1_COMPA_vect)
     timer_handler();
 }
 
+// ISR(TIMER1_COMPB_vect)
+// {
+//     task_a();
+// }
+
 void task_a(void)
 {
-    Serial.print("taskA");
+    Serial.print("A");
 }
 void task_b(void)
 {
-    Serial.print("taskB");
+    Serial.print("B");
 }
 void task_c(void)
 {
-    Serial.print("taskC");
+    Serial.print("C");
 }
 
 // 定電流源測定タスク
