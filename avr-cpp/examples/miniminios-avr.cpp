@@ -178,41 +178,34 @@ ISR(TIMER1_COMPA_vect)
 {
     timer_handler();
 }
-
-// ISR(TIMER1_COMPB_vect)
-// {
-//     task_a();
-// }
-
+void setup()
+{
+    pinMode(9, INPUT);
+    pinMode(3, OUTPUT);
+}
 void task_a(void)
 {
     Serial.print("A");
 }
+
+// 定電流源測定タスク
 void task_b(void)
 {
-    Serial.print("B");
+    int iM1 = digitalRead(9);
+    iPWM = iPWM - (int)((float)(iM1 - iTarget) / 5.0);
+    digitalWrite(3, iPWM);
+    float fCurrent = (float)iM1 / 1.023 * 5.0 / R;
+    Serial.print(fCurrent);
+    Serial.println(" mA");
 }
 void task_c(void)
 {
     Serial.print("C");
 }
 
-// 定電流源測定タスク
-// void loop()
-// {
-//     int iM1 = analogRead(A1);
-//     iPWM = iPWM - (int)((float)(iM1 - iTarget) / 5.0);
-//     analogWrite(3, iPWM);
-//     float fCurrent = (float)iM1 / 1.023 * 5.0 / R;
-//     Serial.print(fCurrent);
-//     Serial.println(" mA");
-//     delay(50);
-// }
-
 int main(void)
 {
     Serial.begin(9600);
-
     create_task(0, 3, task_a);
     create_task(1, 5, task_b);
     create_task(2, 2, task_c);
@@ -221,7 +214,7 @@ int main(void)
     // クロック周波数ベースのタイマ割り込み処理を初期化
     // timer_createの引数にカウンターの周期を指定
     // 62500*256(prescaler)/16MHz = 1秒
-    timer_create(62500);
+    timer_create(625000);
     while (1)
         ; // 無限ループ（割込み待ち）
 }
