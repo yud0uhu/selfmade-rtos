@@ -11,7 +11,7 @@
 #define TASK_ID1 1
 #define TASK_ID2 2
 
-// typedef unsigned char TaskId;
+typedef unsigned char TaskId;
 typedef unsigned int Priority;
 
 #include <stdio.h>
@@ -19,17 +19,36 @@ typedef unsigned int Priority;
 
 /*タイマーハンドラ用*/
 #include <avr/io.h>
-#include <avr/interrupt.h> //割り込みを使用するため
+#include <avr/interrupt.h>
 
 void task_init(unsigned char id);
 void os_start(void);
 int timer_handler();
 void timer_create(unsigned int tick);
+void delete_task(unsigned char task_id);
+
+void TaskRelay(void *pvParameters);
+void TaskPWM(void *pvParameters);
+void TaskDisplay(void *pvParameters);
 
 unsigned char i = 0;
 #define R 47.0
+
+/* タスクの定義 */
+#define THRESHOLD 100
+#define RELAY_DELAY 0
+#define PWM_DELAY 0
+#define fCoeff_P 0.3
+#define fCoeff_I 0.4
+#define fCoeff_D 2.8
+int iTarget = 80;
 int iPWM = 128;
-int iTarget = 98;
+float fP_error = 0.0;
+float fI_error = 0.0;
+float fD_error = 0.0;
+float fP_error_previous = 0.0;
+bool flg = true;
+bool previous_flag = true;
 
 enum TaskState
 {
@@ -46,9 +65,9 @@ typedef struct TCB
     TaskState state_;       /* running, ready, suspendの3つの状態を持つ */
     Priority priority_;     /* タスクの優先度(0~9) */
     struct TCB *p_prev_;    /* 前のタスク */
-    // uint32_t *p_stack_;  /* 各タスクのスタック領域の先頭アドレスを保持 */
+    // uint32_t *p_stack_;  /* TODO 各タスクのスタック領域の先頭アドレスを保持 */
     struct TCB *p_next_; /* 次のタスク*/
-    // uint32_t time_up;
+    // uint32_t time_up; /* TODO タイマーレジスタの状態をスタックに保存*/
     void (*task_handler_)(void);
 } tcb_t;
 
@@ -56,7 +75,6 @@ tcb_t TCB[TASK_ID_MAX];
 typedef struct
 {
     unsigned char running;
-    // int32_t systime;
     int32_t prev;
 } sysinfo_t;
 
@@ -66,7 +84,6 @@ tcb_t ready_que[10];
 // 待ち状態のタスクを登録するリスト
 tcb_t queue_waitng;
 
-// vTaskCode, "NAME", STACK_SIZE, NULL, tskIDLE_PRIORITY, 　&xHandle
 void create_task(unsigned char task_id, Priority priority, void (*task)(void))
 {
     tcb_t *p_task = &TCB[task_id];
@@ -119,9 +136,8 @@ void os_start(void)
     _sysinfo.prev = _sysinfo.running;
     TCB[_sysinfo.running].state_ = RUNNING;
     sei();
-    // timer_handler();
 }
-unsigned char run_que;
+TaskId run_que;
 int timer_handler()
 {
     while (1)
@@ -150,42 +166,29 @@ int timer_handler()
     }
     return 0;
 }
+
 void timer_create(unsigned int tick)
 {
-    // https://www.nongnu.org/avr-libc/user-manual/group__avr__interrupts.html
-    // https://garretlab.web.fc2.com/arduino/inside/hardware/arduino/avr/cores/arduino/wiring_analog.c/analogWrite.html
-    TCCR1A = 0x00;
-    TCCR1B = 0x00;
-    // OCR1A・OCR1Bは16ビットの比較レジスタ
-    OCR1A = tick; // 9pin
-    // OCR1B = 31250; // 10pin
-    /*
-      Arduino Uno ではinit()でCS11とCS10を1に設定している → 1<<CS12で外部クロックを立ち上がりでONにする
-      Arduino Uno ではinit()でCWM10を1に設定している → 1<<WGM12で波形をCTCモードをonにする
-    */
-    TCCR1B |= (1 << CS12) | (1 << WGM12); // CS12 -> 1(prescaler -> 256)
-    /*
-      TIMSK1 はタイマー1(16ビット)のレジスタ
-      TIMSK1のOCE1AとOCIE1Bを1にすることで割り込みの許可を与える
-      OCE1AかOCIE1Bにどちらかに達したときに割り込みがかかる
-      _BV()は中身を1に、~_BV()は0にする
-    */
-    TIMSK1 = (_BV(OCIE1B) | _BV(OCIE1A));
-    // sei();
+    TCCR1A = 0; // 初期化
+    TCCR1B = 0; // 初期化
+    OCR1A = 62500;
+    TCCR1B |= (1 << CS12) | (1 << WGM12); // CS12 -> 1(prescaler -> 256)   CTC mode on
+    // OCIEA -> 1 (enable OCR1A Interrupt)   OCIEB -> 1 (enable OCR1B Interript)
+    TIMSK1 = (1 << OCIE1A);
 }
 
 ISR(TIMER1_COMPA_vect)
 {
     timer_handler();
 }
-void setup()
-{
-    pinMode(9, INPUT);
-    pinMode(3, OUTPUT);
-}
+
 void task_a(void)
 {
-    Serial.print("A");
+    digitalWrite(4, HIGH);
+    delay(100);
+    digitalWrite(4, LOW);
+    delay(100);
+    // Serial.println("TaskA");
 }
 
 // 定電流源測定タスク
@@ -200,21 +203,78 @@ void task_b(void)
 }
 void task_c(void)
 {
-    Serial.print("C");
+    Serial.println("TaskC");
 }
 
-int main(void)
+void setup()
 {
+    pinMode(4, OUTPUT);
+    pinMode(3, OUTPUT);
     Serial.begin(9600);
-    create_task(0, 3, task_a);
-    create_task(1, 5, task_b);
-    create_task(2, 2, task_c);
+
+    create_task(0, 3, TaskPWM);
+    create_task(1, 2, TaskDisplay);
+    create_task(2, 1, TaskRelay);
     os_start();
 
     // クロック周波数ベースのタイマ割り込み処理を初期化
     // timer_createの引数にカウンターの周期を指定
     // 62500*256(prescaler)/16MHz = 1秒
-    timer_create(625000);
+    // 250000*256/16000000 = 4s
+    timer_create(30);
     while (1)
         ; // 無限ループ（割込み待ち）
+}
+
+void TaskRelay(void *pvParameters)
+{ // Relay control
+    (void)pvParameters;
+    if (iPWM < THRESHOLD - 1)
+        flg = true;
+    if (iPWM > THRESHOLD)
+        flg = false;
+    switch (flg)
+    {
+    case true:
+        digitalWrite(4, HIGH);
+        if (previous_flag == false)
+        {
+            previous_flag = true;
+            Serial.println("RELAY ON Control");
+        }
+        break;
+    case false:
+        digitalWrite(4, LOW);
+        if (previous_flag == true)
+        {
+            previous_flag = false;
+            // Serial.println("RELAY OFF Control");
+        }
+        break;
+    }
+}
+void TaskPWM(void *pvParameters)
+{ // PWM control
+    (void)pvParameters;
+    int iMonitor = analogRead(A1);
+    fP_error = fCoeff_P * (float)(iMonitor - iTarget) / 1.5;
+    fI_error += fCoeff_I * fP_error;
+    fD_error = fCoeff_D * (fP_error - fP_error_previous);
+    fP_error_previous = fP_error;
+    iPWM -= (int)(fP_error + fI_error + fD_error);
+    if (iPWM > 255)
+        iPWM = 255;
+    if (iPWM < 0)
+        iPWM = 0;
+    analogWrite(3, iPWM);
+    // Serial.println("PWM Control");
+}
+void TaskDisplay(void *pvParameters)
+{ // PWM control
+    (void)pvParameters;
+    // Serial.println("D");
+}
+
+void loop()
+{
 }
