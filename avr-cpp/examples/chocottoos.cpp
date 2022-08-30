@@ -47,7 +47,7 @@ typedef struct
 } dispatch_t;
 
 static dispatch_t dispatch;
-// 優先度ごとのリスト
+// 実行可能状態のタスクを登録するリスト
 tcb_t ready_que[10];
 
 void create_task(TaskId task_id, Priority priority, void (*task)(void))
