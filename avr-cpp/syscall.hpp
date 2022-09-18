@@ -43,8 +43,8 @@ class TCBList
 {
 public:
     TCBList();
-    void insert_(TCB *pTask);
-    TCB *remove_(TCB *pTask);
+    void insert_(TCB *pTCB);
+    TCB *remove_(TCB *pTCB);
     TCB *ptop_;
 };
 

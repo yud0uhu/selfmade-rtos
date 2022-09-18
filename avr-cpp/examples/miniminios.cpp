@@ -1,7 +1,6 @@
 #define OFF 0
 #define ON OFF + 1
 
-#define TASKA_INTERVAL 10
 #define TASKB_INTERVAL 45
 #define TASKC_INTERVAL 20
 
