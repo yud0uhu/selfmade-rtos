@@ -1,19 +1,19 @@
 OBJS += syscall.o main.o
 TARGET ?= mini
-CC := gcc
-CFLAGS =
-CFLAGS += -g
-CFLAGS += -Wall
+CXX := g++
+CXXFLAGS =
+CXXFLAGS += -std=c++17
+CXXFLAGS += -Wall
 
-.SUFFIXES: .c .o
+.SUFFIXES: .cpp .o
 
 all :		$(TARGET)
 
 $(TARGET) :	$(OBJS)
-		$(CC) $(OBJS) -o $(TARGET) $(CFLAGS)
+		$(CXX) $(OBJS) -o $(TARGET) $(CXXFLAGS)
 
-.c.o :		$<
-		$(CC) -c $< $(CFLAGS)
+.cpp.o :		$<
+		$(CXX) -c $< $(CXXFLAGS)
 
 clean :
 		rm -f $(OBJS) $(TARGET)
