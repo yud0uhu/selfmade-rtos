@@ -1,3 +1,5 @@
+/* Arduino Uno */
+
 #define OFF 0
 #define ON OFF + 1
 
@@ -21,7 +23,6 @@ typedef unsigned int Priority;
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-void task_init(unsigned char id);
 void os_start(void);
 int timer_handler();
 void timer_create(unsigned int tick);
@@ -124,12 +125,6 @@ unsigned char get_top_ready_id(void)
     return 0;
 }
 
-void task_init(unsigned char id)
-{
-    TCB[id].task_id_ = id;
-    TCB[id].state_ = READY;
-}
-
 void os_start(void)
 {
     _sysinfo.running = get_top_ready_id();
@@ -171,7 +166,7 @@ void timer_create(unsigned int tick)
 {
     TCCR1A = 0; // 初期化
     TCCR1B = 0; // 初期化
-    OCR1A = 62500;
+    OCR1A = tick;
     TCCR1B |= (1 << CS12) | (1 << WGM12); // CS12 -> 1(prescaler -> 256)   CTC mode on
     // OCIEA -> 1 (enable OCR1A Interrupt)   OCIEB -> 1 (enable OCR1B Interript)
     TIMSK1 = (1 << OCIE1A);
@@ -180,30 +175,6 @@ void timer_create(unsigned int tick)
 ISR(TIMER1_COMPA_vect)
 {
     timer_handler();
-}
-
-void task_a(void)
-{
-    digitalWrite(4, HIGH);
-    delay(100);
-    digitalWrite(4, LOW);
-    delay(100);
-    // Serial.println("TaskA");
-}
-
-// 定電流源測定タスク
-void task_b(void)
-{
-    int iM1 = digitalRead(9);
-    iPWM = iPWM - (int)((float)(iM1 - iTarget) / 5.0);
-    digitalWrite(3, iPWM);
-    float fCurrent = (float)iM1 / 1.023 * 5.0 / R;
-    Serial.print(fCurrent);
-    Serial.println(" mA");
-}
-void task_c(void)
-{
-    Serial.println("TaskC");
 }
 
 void setup()
@@ -248,7 +219,7 @@ void TaskRelay(void *pvParameters)
         if (previous_flag == true)
         {
             previous_flag = false;
-            // Serial.println("RELAY OFF Control");
+            Serial.println("RELAY OFF Control");
         }
         break;
     }
@@ -267,12 +238,12 @@ void TaskPWM(void *pvParameters)
     if (iPWM < 0)
         iPWM = 0;
     analogWrite(3, iPWM);
-    // Serial.println("PWM Control");
+    Serial.println("PWM Control");
 }
 void TaskDisplay(void *pvParameters)
 { // PWM control
     (void)pvParameters;
-    // Serial.println("D");
+    Serial.println("D");
 }
 
 void loop()
