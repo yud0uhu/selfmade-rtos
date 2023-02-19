@@ -1,0 +1,3 @@
+[submodule "avr-rs-rtos"]
+	path = avr-rs-rtos
+	url = https://github.com/yud0uhu/avr-rs-rtos
